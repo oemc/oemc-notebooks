@@ -1,5 +1,6 @@
 from predict import Predict
 from os import write
+import os
 import random
 import copy
 
@@ -23,19 +24,19 @@ def WinningCheck(board, _player, c):
     r = len(board[c]) - 1
     #Check horizontal line
     if LineCheck(board, _player, c, r, 0, 1) >= 4:
-        print(c, r, '-')
+        #print(c, r, '-')
         return True
     #Check verical line
     if LineCheck(board, _player, c, r, 1, 0) >= 4:
-        print(c, r, '|')
+        #print(c, r, '|')
         return True
     #Check diagonal line
     if LineCheck(board, _player, c, r, 1, 1) >= 4:
-        print(c, r, '/')
+        #print(c, r, '/')
         return True
     #Check couter diagonal line
     if LineCheck(board, _player, c, r, -1, 1) >= 4:
-        print(c, r, '\\')
+        #print(c, r, '\\')
         return True
     return False
 
@@ -65,7 +66,7 @@ def RandomChoice(board_now):
     n = random.choice(possible_choices)
     return n
 
-def AIChoice(board_now):
+def AIChoice(board_now, ai, opponent, showText):
     possible_choices = []
     for i in range(7):
         if(len(board_now[i]) < 6):
@@ -74,15 +75,34 @@ def AIChoice(board_now):
         print('dead game')
         return -1
     bestSoFar = possible_choices[0]
-    bestPoints = 0
+    bestPoints = -2
     for i in possible_choices:
         iChoice = copy.deepcopy(board_now)
-        iChoice[i].append(0) #AI is always CPU that is always 0
+        # AI is player ai
+        iChoice[i].append(ai) 
+        # Check for winning chance 
+        if WinningCheck(iChoice, ai, i):
+            bestSoFar = i
+            break
+        # Check for opponent winning chance
+        jChoice = copy.deepcopy(board_now)
+        jChoice[i].append(opponent)
+        if WinningCheck(jChoice, opponent, i):
+            bestPoints = 2 # So this is the best choice unless we find a chance to win later
+            bestSoFar = i
+            continue
+        # If none of the players have a chance to win, lets predict the best move
         iPoints = Predict(iChoice)
+        # Check for opponent next turn
+        if len(iChoice[i]) < 6:
+            iChoice[i].append(opponent)
+            if WinningCheck(iChoice, opponent, i):
+                iPoints = iPoints - 1
+        # Compare with previous best move
         if iPoints > bestPoints:
             bestPoints = iPoints
             bestSoFar = i
-    print('CPU move:', bestSoFar)
+    if showText == 0: print('CPU move:', bestSoFar)
     return bestSoFar
 
 def BoardToString(board_now):
@@ -112,18 +132,26 @@ def WriteToFile(path, winner, game_output):
             else:
                 file.write(x + '0\n')
 
-def Game():
+def Game(opponent):
     game_output = []
     board = [[], [], [], [], [], [], []]
     player = random.randint(0, 1)
     while True:
-        printBoard(board)
+        if opponent == 0: printBoard(board)
         player = (player + 1) % 2
+        ## AI is always player 0
         if player == 0:
-            print('CPU turn')
-            n = AIChoice(board)
-        else:
+            if opponent == 0: print('CPU turn')
+            n = AIChoice(board, 0, 1, opponent)
+        # If the opponent is a human
+        elif opponent == 0:
             n = int(input('What is your move?'))
+        # If the opponent is an AI
+        elif opponent == 1:
+            n = AIChoice(board, 1, 0, opponent)
+        # If the opponent is an randomCPU
+        else:
+            n = RandomChoice(board)
         if n < 0:
             game_output = []
             board = [[], [], [], [], [], [], []]
@@ -131,20 +159,27 @@ def Game():
         board[n].append(player)
         game_output.append((BoardToString(board), player))
         if WinningCheck(board, player, n):
-            printBoard(board)
+            if opponent == 0: printBoard(board)
             playerName = 'CPU' if player == 0 else 'Player'
-            print(playerName, 'wins!')
+            if opponent == 0: print(playerName, 'wins!')
             break
     return (player, game_output)
 
 ######Start Here
+print('who is playing? (0 - player) (1 - ai) (2 - randomCPU)')
+opponent = int(input())
 print('Output file name:')
 output_file = input() + '.txt'
 print('Number of games:')
 no_games = int(input())
-
+clear = lambda: os.system('cls')
+    
 i = 0
 while(i < no_games):
-    player, game_output = Game()
+    clear()
+    print('Game: ', i, '/', no_games)
+    player, game_output = Game(opponent)
     WriteToFile(output_file, player, game_output)
     i = i + 1
+
+print('Finished!, outputfile:', output_file)
